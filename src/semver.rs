@@ -8,6 +8,7 @@ use std::cmp::Ordering;
 use std::cmp::Ordering::{Equal, Greater, Less};
 use std::hash::{Hash, Hasher};
 use std::str::FromStr;
+use nom::error::Error as NomError;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -205,7 +206,7 @@ impl SemVer {
 
     /// The raw `nom` parser for [`SemVer`]. Feel free to use this in
     /// combination with other general `nom` parsers.
-    pub fn parse(i: &str) -> IResult<&str, SemVer> {
+    /*pub fn parse(i: &str) -> IResult<&str, SemVer> {
         let (i, major) = crate::parsers::unsigned(i)?;
         let (i, _) = char('.')(i)?;
         let (i, minor) = crate::parsers::unsigned(i)?;
@@ -218,6 +219,71 @@ impl SemVer {
             major,
             minor,
             patch,
+            pre_rel,
+            meta,
+        };
+
+        Ok((i, sv))
+    }*/
+    pub fn parse(i: &str) -> IResult<&str, SemVer> {
+        let (i, major) = crate::parsers::unsigned(i)?;
+
+        let (i, minor) = if let Ok((i, _)) = char::<&str, NomError<&str>>('.') (i) {
+            crate::parsers::unsigned(i).map(|(i, m)| (i, Some(m)))?
+        } else {
+            (i, None)
+        };
+
+        let (i, patch) = if let Some(minor) = minor {
+            if let Ok((i, _)) = char::<&str, NomError<&str>>('.') (i) {
+                crate::parsers::unsigned(i).map(|(i, p)| (i, Some(p)))?
+            } else {
+                (i, None)
+            }
+        } else {
+            (i, None)
+        };
+
+        let (i, substrate) = if let Some(patch) = patch {
+            if let Ok((i, _)) = char::<&str, NomError<&str>>('.') (i) {
+                crate::parsers::unsigned(i).map(|(i, s)| (i, Some(s)))?
+            } else {
+                (i, None)
+            }
+        } else {
+            (i, None)
+        };
+
+        let (i, pre_rel) = if substrate.is_some() {
+            if let Ok((i, _)) = char::<&str, NomError<&str>>('.') (i) {
+                opt(Release::parse).parse(i)?
+            } else {
+                (i, None)
+            }
+        } else {
+            (i, None)
+        };
+
+        let (i, mut meta) = if pre_rel.is_some() {
+            if let Ok((i, _)) = char::<&str, NomError<&str>>('.') (i) {
+                opt(crate::parsers::meta).parse(i)?
+            } else {
+                (i, None)
+            }
+        } else {
+            (i, None)
+        };
+
+        if meta.is_none() {
+            if let Some(substrate) = substrate {
+                meta = Some(substrate.to_string());
+            }
+        }
+
+        let sv = SemVer {
+            major,
+            minor: minor.unwrap_or(0),
+            patch: patch.unwrap_or(0),
             pre_rel,
             meta,
         };

@@ -9,9 +9,6 @@ use nom::{IResult, Parser};
 /// Parse an unsigned integer.
 ///
 /// Should yield either a zero on its own, or some other multi-digit number.
-//pub(crate) fn unsigned(i: &str) -> IResult<&str, u32> {
-//    map_res(alt((tag("0"), digit1)), |s: &str| s.parse::<u32>()).parse(i)
-//}
 pub(crate) fn unsigned(input: &str) -> IResult<&str, u32> {
     let mut end = 0;
     for (idx, c) in input.char_indices() {
@@ -23,7 +20,6 @@ pub(crate) fn unsigned(input: &str) -> IResult<&str, u32> {
 
     let (number_str, rest) = input.split_at(end);
 
-    // If nothing was parsed, treat as 0 or return an error — here we return an error
     if number_str.is_empty() {
         return Ok((rest, 0));
     }
